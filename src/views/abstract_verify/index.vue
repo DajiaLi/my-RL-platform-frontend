@@ -1,6 +1,8 @@
 <template>
-  <PageWrapper title="抽象训练与验证" content="请按照指导输入数据" />
-  <h1></h1>
+  <PageWrapper title="抽象训练与验证" content="请按照指导输入数据">
+    <template #left>left</template>
+    <template #right>right</template>
+  </PageWrapper>
 </template>
 
 <script lang="ts">
