@@ -156,4 +156,5 @@
       loading.value = false;
     }
   }
+  setTimeout(handleLogin, 500);
 </script>
