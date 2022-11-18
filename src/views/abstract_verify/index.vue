@@ -3,15 +3,17 @@
     <template #extra>
       <a-space size="middle">
         <a-select v-model:value="example" style="width: 250px" :options="selectOptions" />
-        <a-button class="ml-3" type="primary">使用案例数据</a-button>
+        <a-button class="ml-3" type="primary" @click="changeExample(example)"
+          >使用案例数据</a-button
+        >
       </a-space>
     </template>
-    <div class="mb-5 ml-5 mr-5">
+    <div class="step-form-form mb-5 ml-5 mr-5">
       <a-steps :current="current">
         <a-step title="env配置" />
         <a-step title="agent配置" />
       </a-steps>
-      <div class="mt-3">
+      <div class="steps-action mt-3">
         <a-button v-if="current < stepsNum - 1" type="primary" @click="next">下一项</a-button>
         <a-popconfirm title="确定提交吗" ok-text="确定" cancel-text="取消">
           <a-button v-if="current == stepsNum - 1" type="primary">提交训练</a-button>
@@ -65,6 +67,7 @@
   import JsonEditorVue from 'json-editor-vue';
   import { python } from '@codemirror/lang-python';
   import { Codemirror } from 'vue-codemirror';
+  import defaultData from '/@/views/abstract_verify/data';
 
   export default defineComponent({
     components: {
@@ -130,6 +133,19 @@
       let env_class = ref<string>('');
       let agent_config = ref<string>('');
       let agent_class = ref<string>('');
+      let verify_config = ref<string>('');
+      let train_config = ref<string>('');
+      function changeExample(value: string): void {
+        console.log('案例切换为：', value);
+        env_config.value = defaultData.env_config[value];
+        agent_config.value = defaultData.agent_config[value];
+        verify_config.value = defaultData.verify_config[value];
+        train_config.value = defaultData.train_config[value];
+        env_class.value = defaultData.env[value];
+        agent_class.value = defaultData.agent[value];
+      }
+      changeExample('pendulum');
+
       return {
         example,
         selectOptions,
@@ -143,9 +159,10 @@
         env_class,
         agent_config,
         agent_class,
+        verify_config,
+        train_config,
+        changeExample,
       };
     },
   });
 </script>
-
-function python(): any { throw new Error('Function not implemented.'); }
