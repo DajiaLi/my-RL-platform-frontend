@@ -14,7 +14,7 @@ import { setupStore } from '/@/store';
 import { setupGlobDirectives } from '/@/directives';
 import { setupI18n } from '/@/locales/setupI18n';
 import { registerGlobComp } from '/@/components/registerGlobComp';
-
+import GoEasy from 'goeasy';
 // Importing on demand in local development will increase the number of browser requests by around 20%.
 // This may slow down the browser refresh speed.
 // Therefore, only enable on-demand importing in production environments .
@@ -52,6 +52,12 @@ async function bootstrap() {
 
   // https://next.router.vuejs.org/api/#isready
   // await router.isReady();
+
+  app.config.globalProperties.$goeasy = GoEasy.getInstance({
+    host: 'hangzhou.goeasy.io', //若是新加坡区域：singapore.goeasy.io
+    appkey: 'BC-080f24802f2f489b8e9c89d2854ed63f',
+    modules: ['pubsub'], //根据需要，传入‘pubsub’或'im’，或数组方式同时传入
+  });
 
   app.mount('#app');
 }

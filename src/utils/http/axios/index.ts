@@ -71,16 +71,16 @@ const transform: AxiosTransform = {
           timeoutMsg = message;
         }
     }
+    return res.data;
+    // // errorMessageMode=‘modal’的时候会显示modal错误弹窗，而不是消息提示，用于一些比较重要的错误
+    // // errorMessageMode='none' 一般是调用时明确表示不希望自动弹出错误提示
+    // if (options.errorMessageMode === 'modal') {
+    //   createErrorModal({ title: t('sys.api.errorTip'), content: timeoutMsg });
+    // } else if (options.errorMessageMode === 'message') {
+    //   createMessage.error(timeoutMsg);
+    // }
 
-    // errorMessageMode=‘modal’的时候会显示modal错误弹窗，而不是消息提示，用于一些比较重要的错误
-    // errorMessageMode='none' 一般是调用时明确表示不希望自动弹出错误提示
-    if (options.errorMessageMode === 'modal') {
-      createErrorModal({ title: t('sys.api.errorTip'), content: timeoutMsg });
-    } else if (options.errorMessageMode === 'message') {
-      createMessage.error(timeoutMsg);
-    }
-
-    throw new Error(timeoutMsg || t('sys.api.apiRequestFailed'));
+    // throw new Error(timeoutMsg || t('sys.api.apiRequestFailed'));
   },
 
   // 请求之前处理config
