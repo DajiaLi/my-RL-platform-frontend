@@ -75,7 +75,10 @@
   import { Codemirror } from 'vue-codemirror';
   import defaultData from '/@/views/abstract_verify/data';
   import { RunTask } from '/@/api/sys/abs_verify';
-
+  import { useMessage } from '/@/hooks/web/useMessage';
+  import { useGo } from '/@/hooks/web/usePage';
+  import { useI18n } from '/@/hooks/web/useI18n';
+  const { t } = useI18n();
   export default defineComponent({
     components: {
       PageWrapper,
@@ -89,6 +92,8 @@
       [Divider.name]: Divider,
     },
     setup() {
+      const go = useGo();
+      const { createMessage, createErrorModal } = useMessage();
       const selectOptions = ref<SelectProps['options']>([
         {
           value: 'pendulum',
@@ -104,7 +109,6 @@
       function pre(): void {
         current.value--;
       }
-
       function confirm(e: MouseEvent): void {
         submitTask();
       }
@@ -185,8 +189,7 @@
       });
 
       // async function submitTask(): Promise<void>
-      const submitTask = async () => {
-        console.log('clid submit');
+      async function submitTask(): Promise<void> {
         let res = await RunTask({
           channel: channel.value,
           task_name: 'trainify_verify',
@@ -201,10 +204,29 @@
         });
         if (res.code === 20000) {
           console.log('成功返回');
+          proxy.$goeasy.pubsub.subscribe({
+            channel: channel.value,
+            onMessage: function (message) {
+              console.log('接受消息成功');
+            },
+            onSuccess: function () {
+              console.log('Channel ' + channel.value + ' 订阅成功。');
+            },
+            onFailed: function (error) {
+              createErrorModal({
+                title: t('sys.api.errorTip'),
+                content: '建立WebSocket通信连接成功，但是订阅频道失败，请稍后再试',
+              });
+            },
+          });
+          go('/about');
         } else {
-          console.log('返回失败');
+          createErrorModal({
+            title: t('sys.api.errorTip'),
+            content: res.data.msg,
+          });
         }
-      };
+      }
       return {
         example,
         selectOptions,
