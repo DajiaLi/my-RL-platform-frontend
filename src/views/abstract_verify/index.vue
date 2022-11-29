@@ -219,7 +219,7 @@
               });
             },
           });
-          go('/about');
+          go('/result/index/' + channel.value);
         } else {
           createErrorModal({
             title: t('sys.api.errorTip'),
