@@ -84,6 +84,7 @@
   import defaultData from '/@/views/abstract_verify/data';
   import { useMessage } from '/@/hooks/web/useMessage';
   import { randomString } from '/@/utils/randomString';
+  import axios from 'axios';
 
   const { t } = useI18n();
   const go = useGo();
@@ -179,6 +180,16 @@
 
   // async function submitTask(): Promise<void>
   async function submitTask(): Promise<void> {
+    // //mac版本直接采用axios方式发送post请求，会出现跨域问题
+    // axios({
+    //   url: 'http://127.0.0.1:3000/tbridge/t/',
+    //   method: 'post',
+    //   data: {
+    //     task_name: 'trainify_verify',
+    //   },
+    // }).then((res) => {
+    //   console.log(res);
+    // });
     let res = await RunTask({
       channel: taskInfo.channel,
       task_name: 'trainify_verify',
