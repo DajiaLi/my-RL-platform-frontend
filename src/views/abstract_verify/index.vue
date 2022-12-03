@@ -1,39 +1,41 @@
 <template>
   <PageWrapper title="抽象训练与验证" content="请按照指导输入数据">
     <template #extra>
-      <a-space size="middle">
-        <a-select v-model:value="example" style="width: 250px" :options="selectOptions" />
-        <a-button class="ml-3" type="primary" @click="changeExample(example)"
-          >使用案例数据</a-button
-        >
-      </a-space>
+      <ASpace size="middle">
+        <ASelect v-model:value="example" style="width: 250px" :options="selectOptions" />
+        <AButton class="ml-3" type="primary" @click="changeExample(example)">使用案例数据</AButton>
+      </ASpace>
     </template>
     <div class="step-form-form mb-5 ml-5 mr-5">
-      <a-steps :current="current">
-        <a-step title="env配置" />
-        <a-step title="agent配置" />
-      </a-steps>
+      <ASteps :current="current">
+        <AStep title="env配置" />
+        <AStep title="agent配置" />
+        <!-- <a-step title="verify配置" /> -->
+      </ASteps>
       <div class="steps-action mt-3">
-        <a-button v-if="current < stepsNum - 1" type="primary" @click="next">下一项</a-button>
-        <a-popconfirm
+        <AButton v-if="current < stepsNum - 1" type="primary" @click="next">下一项</AButton>
+        <!-- <APopconfirm
           title="确定提交吗"
           ok-text="确定"
           cancel-text="取消"
           @confirm="confirm"
           @cancel="cancel"
+        > -->
+        <AButton v-if="current == stepsNum - 1" type="primary" @click="submitTask"
+          >提交训练</AButton
         >
-          <a-button v-if="current == stepsNum - 1" type="primary">提交训练</a-button>
-        </a-popconfirm>
-        <a-button class="ml-3" v-if="current > 0" @click="pre">上一项</a-button>
+        <!-- </APopconfirm> -->
+        <AButton class="ml-3" v-if="current > 0" @click="prev">上一项</AButton>
       </div>
     </div>
-    <a-card title="1 env相关配置" v-show="current === 0">
+    <ACard title="1 env相关配置" v-show="current === 0">
       <h2>1. 请以json格式输入环境配置env_config</h2>
-      <JsonEditorVue v-model="env_config" mode="text" :options="cmOptions" />
-      <a-divider />
+      <json-editor-vue v-model="taskInfo.env_config" mode="text" :options="cmOptions" />
+      <ADivider />
       <h2>2. 请输入环境Class</h2>
+      <div></div>
       <codemirror
-        v-model="env_class"
+        v-model="taskInfo.env_class"
         placeholder="在这里输入代码"
         :style="codeOptions.style"
         :mode="codeOptions.mode"
@@ -43,15 +45,15 @@
         :tabSize="codeOptions.tabSize"
         :extensions="codeOptions.extensions"
       />
-    </a-card>
-    <a-card title="2 agent相关配置" v-show="current === 1">
+    </ACard>
+    <ACard title="2 anent相关配置" v-show="current === 1">
       <h2>1. 请以json格式输入agent配置agent_config</h2>
-      <JsonEditorVue v-model="agent_config" mode="text" :options="cmOptions" />
-      <a-divider />
+      <json-editor-vue v-model="taskInfo.agent_config" mode="text" :options="cmOptions" />
+      <ADivider />
       <h2>2. 请输入agent Class</h2>
       <div></div>
       <codemirror
-        v-model="agent_class"
+        v-model="taskInfo.agent_class"
         placeholder="在这里输入代码"
         :style="codeOptions.style"
         :mode="codeOptions.mode"
@@ -61,193 +63,340 @@
         :tabSize="codeOptions.tabSize"
         :extensions="codeOptions.extensions"
       />
-    </a-card>
+    </ACard>
+    <!-- <ACard title="3 verify相关配置" v-show="current === 2">
+      <h2>1. 请以json格式输入verify相关配置verify_config</h2>
+      <JsonEditorVue v-model="env_config" mode="text" :options="cmOptions" />
+    </ACard> -->
   </PageWrapper>
 </template>
-
-<script lang="ts">
-  import { reactive, ref, defineComponent, getCurrentInstance } from 'vue';
-  import { PageWrapper } from '/@/components/Page';
-  import type { SelectProps } from 'ant-design-vue';
-  import { Divider, Popconfirm, Select, Card, Steps } from 'ant-design-vue';
-  import JsonEditorVue from 'json-editor-vue';
-  import { python } from '@codemirror/lang-python';
-  import { Codemirror } from 'vue-codemirror';
-  import defaultData from '/@/views/abstract_verify/data';
-  import { RunTask } from '/@/api/sys/abs_verify';
-  import { useMessage } from '/@/hooks/web/useMessage';
+<script lang="ts" setup>
   import { useGo } from '/@/hooks/web/usePage';
+  import { toRaw } from '@vue/reactivity';
   import { useI18n } from '/@/hooks/web/useI18n';
+  import { RunTask } from '/@/api/sys/trainify';
+  import { useResultStore } from '/@/store/modules/result';
+  import { reactive, ref, getCurrentInstance } from 'vue';
+  import { PageWrapper } from '/@/components/Page';
+  import JsonEditorVue from 'json-editor-vue';
+  import { Codemirror } from 'vue-codemirror';
+  import { python } from '@codemirror/lang-python';
+  import defaultData from '/@/views/abstract_verify/data';
+  import { useMessage } from '/@/hooks/web/useMessage';
+  import { randomString } from '/@/utils/randomString';
+
   const { t } = useI18n();
-  export default defineComponent({
-    components: {
-      PageWrapper,
-      JsonEditorVue,
-      Codemirror,
-      [Card.name]: Card,
-      [Steps.name]: Steps,
-      [Steps.Step.name]: Steps.Step,
-      [Select.name]: Select,
-      [Popconfirm.name]: Popconfirm,
-      [Divider.name]: Divider,
+  const go = useGo();
+  const { createMessage, createErrorModal } = useMessage();
+  const selectOptions = ref([
+    {
+      value: 'pendulum',
+      label: 'Pendulum环境与DDPG算法',
     },
-    setup() {
-      const go = useGo();
-      const { createMessage, createErrorModal } = useMessage();
-      const selectOptions = ref<SelectProps['options']>([
-        {
-          value: 'pendulum',
-          label: 'Pendulum环境与DDPG算法',
-        },
-      ]);
-      let example = ref<string>('pendulum');
-      let current = ref<number>(0);
-      const stepsNum = ref<number>(2);
-      function next(): void {
-        current.value++;
-      }
-      function pre(): void {
-        current.value--;
-      }
-      function confirm(e: MouseEvent): void {
-        submitTask();
-      }
-      function cancel(e: MouseEvent): void {
-        console.log(e);
-      }
-      function ranStr(len: number): string {
-        len = len || 32;
-        var text = '';
-        var possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        for (var i = 0; i < len; i++)
-          text += possible.charAt(Math.floor(Math.random() * possible.length));
-        return text;
-      }
+  ]);
+  let example = ref<string>('pendulum');
+  let current = ref<number>(0);
+  const stepsNum = ref<number>(2);
+  function next(): void {
+    current.value++;
+  }
+  function prev(): void {
+    current.value--;
+  }
+  // function confirm(e: MouseEvent): void {
+  //   submitTask();
+  // }
+  // function cancel(e: MouseEvent): void {
+  //   console.log(e);
+  // }
 
-      const cmOptions = reactive({
-        // mode: 'text/javascript',
-        mode: 'application/json',
-        theme: 'blackboard light',
-        // theme: "solarized light",
-        // theme: "base16-light",
-        readOnly: true,
-        lineNumbers: true, // 是否显示行号
-        lineWrapping: true, // 是否应滚动或换行以显示长行
-        extraKeys: { Ctrl: 'autocomplete' },
-        autocorrect: true,
-        lineWiseCopyCut: true, // 在没有选择的情况下进行复制或剪切将复制或剪切有光标的整行。
-        showCursorWhenSelecting: true, // 选择处于活动状态时是否应绘制光标
-        maxHighlightLength: Infinity, // 显示长行的时候 这个值是不限制，如果要做限制的话，值是number类型
-        matchBrackets: true, // 光标匹配括号
-        foldGutter: true,
-        autoCloseTags: true,
-        matchTags: { bothTags: true },
-        styleActiveLine: true,
-        smartIndent: true,
-        // gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter', 'CodeMirror-lint-markers'],
-        gutters: ['CodeMirror-lint-markers'],
-      });
-      const codeOptions = reactive({
-        style: { height: '500px' },
-        mode: 'text/x-python',
-        spellcheck: true,
-        autofocus: false,
-        indentWithTab: true,
-        tabSize: 2,
-        extensions: [python()], //传递给CodeMirror EditorState。创建({扩展})
-      });
-      let channel = ref<string>(ranStr(6));
-      let env_config = ref<string>('');
-      let env_class = ref<string>('');
-      let agent_config = ref<string>('');
-      let agent_class = ref<string>('');
-      let verify_config = ref<string>('');
-      let train_config = ref<string>('');
-      function changeExample(value: string): void {
-        console.log('案例切换为：', value);
-        env_config.value = defaultData.env_config[value];
-        agent_config.value = defaultData.agent_config[value];
-        verify_config.value = defaultData.verify_config[value];
-        train_config.value = defaultData.train_config[value];
-        env_class.value = defaultData.env[value];
-        agent_class.value = defaultData.agent[value];
-      }
-      changeExample('pendulum');
-      const { proxy } = getCurrentInstance();
-      proxy.$goeasy.connect({
-        id: '001', //pubsub选填，im必填，最大长度60字符
-        data: {}, //必须是一个对象，pubsub选填，im必填，最大长度300字符，用于上下线提醒和查询在线用户列表时，扩展更多的属性
-        onSuccess: function () {
-          console.log('GoEasy 连接成功');
-        },
-        onFailed: function (error) {
-          console.log('Failed to connect GoEasy, code:' + error.code + ',error:' + error.content);
-        },
-        onProgress: function (attempts) {
-          console.log('GoEasy is connecting', attempts);
-        },
-      });
+  const cmOptions = reactive({
+    // mode: 'text/javascript',
+    mode: 'application/json',
+    theme: 'blackboard light',
+    // theme: "solarized light",
+    // theme: "base16-light",
+    readOnly: true,
+    lineNumbers: true, // 是否显示行号
+    lineWrapping: true, // 是否应滚动或换行以显示长行
+    extraKeys: { Ctrl: 'autocomplete' },
+    autocorrect: true,
+    lineWiseCopyCut: true, // 在没有选择的情况下进行复制或剪切将复制或剪切有光标的整行。
+    showCursorWhenSelecting: true, // 选择处于活动状态时是否应绘制光标
+    maxHighlightLength: Infinity, // 显示长行的时候 这个值是不限制，如果要做限制的话，值是number类型
+    matchBrackets: true, // 光标匹配括号
+    foldGutter: true,
+    autoCloseTags: true,
+    matchTags: { bothTags: true },
+    styleActiveLine: true,
+    smartIndent: true,
+    // gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter', 'CodeMirror-lint-markers'],
+    gutters: ['CodeMirror-lint-markers'],
+  });
+  const codeOptions = reactive({
+    style: { height: '500px' },
+    mode: 'text/x-python',
+    spellcheck: true,
+    autofocus: false,
+    indentWithTab: true,
+    tabSize: 2,
+    extensions: [python()], //传递给CodeMirror EditorState。创建({扩展})
+  });
 
-      // async function submitTask(): Promise<void>
-      async function submitTask(): Promise<void> {
-        let res = await RunTask({
-          channel: channel.value,
-          task_name: 'trainify_verify',
-          // params: {
-          //   env_class: env_class.value,
-          //   agent_class: agent_class.value,
-          //   env_config: JSON.parse(env_config.value),
-          //   agent_config: JSON.parse(agent_config.value),
-          //   verify_config: JSON.parse(verify_config.value),
-          //   train_config: JSON.parse(train_config.value),
-          // },
-        });
-        if (res.code === 20000) {
-          console.log('成功返回');
-          proxy.$goeasy.pubsub.subscribe({
-            channel: channel.value,
-            onMessage: function (message) {
-              console.log('接受消息成功');
-            },
-            onSuccess: function () {
-              console.log('Channel ' + channel.value + ' 订阅成功。');
-            },
-            onFailed: function (error) {
-              createErrorModal({
-                title: t('sys.api.errorTip'),
-                content: '建立WebSocket通信连接成功，但是订阅频道失败，请稍后再试',
-              });
-            },
-          });
-          go('/result/index/' + channel.value);
-        } else {
-          createErrorModal({
-            title: t('sys.api.errorTip'),
-            content: res.data.msg,
-          });
-        }
-      }
-      return {
-        example,
-        selectOptions,
-        current,
-        stepsNum,
-        next,
-        pre,
-        confirm,
-        cancel,
-        ranStr,
-        cmOptions,
-        codeOptions,
-        channel,
-        env_config,
-        env_class,
-        agent_config,
-        agent_class,
-        verify_config,
-        train_config,
-        changeExample,
-      };
+  const taskInfo = reactive({
+    channel: randomString(6),
+    env_config: '',
+    agent_config: '',
+    verify_config: '',
+    train_config: '',
+    env_class: '',
+    agent_class: '',
+  });
+  function changeExample(value: string): void {
+    console.log('案例切换为：', value);
+    taskInfo.env_config = defaultData.env_config[value];
+    taskInfo.agent_config = defaultData.agent_config[value];
+    taskInfo.verify_config = defaultData.verify_config[value];
+    taskInfo.train_config = defaultData.train_config[value];
+    taskInfo.env_class = defaultData.env[value];
+    taskInfo.agent_class = defaultData.agent[value];
+  }
+  changeExample('pendulum');
+  const { proxy } = getCurrentInstance();
+  proxy.$goeasy.connect({
+    id: '001', //pubsub选填，im必填，最大长度60字符
+    data: {}, //必须是一个对象，pubsub选填，im必填，最大长度300字符，用于上下线提醒和查询在线用户列表时，扩展更多的属性
+    onSuccess: function () {
+      console.log('GoEasy 连接成功');
+    },
+    onFailed: function (error) {
+      console.log('Failed to connect GoEasy, code:' + error.code + ',error:' + error.content);
+    },
+    onProgress: function (attempts) {
+      console.log('GoEasy is connecting', attempts);
     },
   });
+
+  // async function submitTask(): Promise<void>
+  async function submitTask(): Promise<void> {
+    let res = await RunTask({
+      channel: taskInfo.channel,
+      task_name: 'trainify_verify',
+      // params: {
+      //   env_class: env_class.value,
+      //   agent_class: agent_class.value,
+      //   env_config: JSON.parse(env_config.value),
+      //   agent_config: JSON.parse(agent_config.value),
+      //   verify_config: JSON.parse(verify_config.value),
+      //   train_config: JSON.parse(train_config.value),
+      // },
+    });
+    if (res.code === 20000) {
+      console.log('成功返回');
+      proxy.$goeasy.pubsub.subscribe({
+        channel: taskInfo.channel,
+        onMessage: function (message) {
+          console.log('接受消息成功');
+        },
+        onSuccess: function () {
+          console.log('Channel ' + taskInfo.channel + ' 订阅成功。');
+        },
+        onFailed: function (error) {
+          createErrorModal({
+            title: t('sys.api.errorTip'),
+            content: '建立WebSocket通信连接成功，但是订阅频道失败，请稍后再试',
+          });
+        },
+      });
+      go('/result/index/' + taskInfo.channel);
+    } else {
+      createErrorModal({
+        title: t('sys.api.errorTip'),
+        content: res.data.msg,
+      });
+    }
+  }
 </script>
+
+<!-- <script lang="ts">
+//   import { reactive, ref, defineComponent, getCurrentInstance } from 'vue';
+//   import { PageWrapper } from '/@/components/Page';
+//   import type { SelectProps } from 'ant-design-vue';
+//   import { Divider, Popconfirm, Select, Card, Steps } from 'ant-design-vue';
+//   import JsonEditorVue from 'json-editor-vue';
+//   import { python } from '@codemirror/lang-python';
+//   import { Codemirror } from 'vue-codemirror';
+//   import defaultData from '/@/views/abstract_verify/data';
+//   import { RunTask } from '/@/api/sys/abs_verify';
+//   import { useMessage } from '/@/hooks/web/useMessage';
+//   import { useGo } from '/@/hooks/web/usePage';
+//   import { useI18n } from '/@/hooks/web/useI18n';
+//   const { t } = useI18n();
+//   export default defineComponent({
+//     components: {
+//       PageWrapper,
+//       JsonEditorVue,
+//       Codemirror,
+//       [Card.name]: Card,
+//       [Steps.name]: Steps,
+//       [Steps.Step.name]: Steps.Step,
+//       [Select.name]: Select,
+//       [Popconfirm.name]: Popconfirm,
+//       [Divider.name]: Divider,
+//     },
+//     setup() {
+//       const go = useGo();
+//       const { createMessage, createErrorModal } = useMessage();
+//       const selectOptions = ref<SelectProps['options']>([
+//         {
+//           value: 'pendulum',
+//           label: 'Pendulum环境与DDPG算法',
+//         },
+//       ]);
+//       let example = ref<string>('pendulum');
+//       let current = ref<number>(0);
+//       const stepsNum = ref<number>(2);
+//       function next(): void {
+//         current.value++;
+//       }
+//       function pre(): void {
+//         current.value--;
+//       }
+//       function confirm(e: MouseEvent): void {
+//         submitTask();
+//       }
+//       function cancel(e: MouseEvent): void {
+//         console.log(e);
+//       }
+//       function randomString(len: number): string {
+//         len = len || 32;
+//         var text = '';
+//         var possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+//         for (var i = 0; i < len; i++)
+//           text += possible.charAt(Math.floor(Math.random() * possible.length));
+//         return text;
+//       }
+
+//       const cmOptions = reactive({
+//         // mode: 'text/javascript',
+//         mode: 'application/json',
+//         theme: 'blackboard light',
+//         // theme: "solarized light",
+//         // theme: "base16-light",
+//         readOnly: true,
+//         lineNumbers: true, // 是否显示行号
+//         lineWrapping: true, // 是否应滚动或换行以显示长行
+//         extraKeys: { Ctrl: 'autocomplete' },
+//         autocorrect: true,
+//         lineWiseCopyCut: true, // 在没有选择的情况下进行复制或剪切将复制或剪切有光标的整行。
+//         showCursorWhenSelecting: true, // 选择处于活动状态时是否应绘制光标
+//         maxHighlightLength: Infinity, // 显示长行的时候 这个值是不限制，如果要做限制的话，值是number类型
+//         matchBrackets: true, // 光标匹配括号
+//         foldGutter: true,
+//         autoCloseTags: true,
+//         matchTags: { bothTags: true },
+//         styleActiveLine: true,
+//         smartIndent: true,
+//         // gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter', 'CodeMirror-lint-markers'],
+//         gutters: ['CodeMirror-lint-markers'],
+//       });
+//       const codeOptions = reactive({
+//         style: { height: '500px' },
+//         mode: 'text/x-python',
+//         spellcheck: true,
+//         autofocus: false,
+//         indentWithTab: true,
+//         tabSize: 2,
+//         extensions: [python()], //传递给CodeMirror EditorState。创建({扩展})
+//       });
+
+//       const taskInfo = reactive({
+//         channel: randomString(6),
+//         env_config: '',
+//         agent_config: '',
+//         verify_config: '',
+//         train_config: '',
+//         env_class: '',
+//         agent_class: '',
+//       });
+//       function changeExample(value: string): void {
+//         console.log('案例切换为：', value);
+//         taskInfo.env_config = defaultData.env_config[value];
+//         taskInfo.agent_config = defaultData.agent_config[value];
+//         taskInfo.verify_config = defaultData.verify_config[value];
+//         taskInfo.train_config = defaultData.train_config[value];
+//         taskInfo.env_class = defaultData.env[value];
+//         taskInfo.agent_class = defaultData.agent[value];
+//       }
+//       changeExample('pendulum');
+//       const { proxy } = getCurrentInstance();
+//       proxy.$goeasy.connect({
+//         id: '001', //pubsub选填，im必填，最大长度60字符
+//         data: {}, //必须是一个对象，pubsub选填，im必填，最大长度300字符，用于上下线提醒和查询在线用户列表时，扩展更多的属性
+//         onSuccess: function () {
+//           console.log('GoEasy 连接成功');
+//         },
+//         onFailed: function (error) {
+//           console.log('Failed to connect GoEasy, code:' + error.code + ',error:' + error.content);
+//         },
+//         onProgress: function (attempts) {
+//           console.log('GoEasy is connecting', attempts);
+//         },
+//       });
+
+//       // async function submitTask(): Promise<void>
+//       async function submitTask(): Promise<void> {
+//         let res = await RunTask({
+//           channel: taskInfo.channel,
+//           task_name: 'trainify_verify',
+//           // params: {
+//           //   env_class: env_class.value,
+//           //   agent_class: agent_class.value,
+//           //   env_config: JSON.parse(env_config.value),
+//           //   agent_config: JSON.parse(agent_config.value),
+//           //   verify_config: JSON.parse(verify_config.value),
+//           //   train_config: JSON.parse(train_config.value),
+//           // },
+//         });
+//         if (res.code === 20000) {
+//           console.log('成功返回');
+//           proxy.$goeasy.pubsub.subscribe({
+//             channel: channel.value,
+//             onMessage: function (message) {
+//               console.log('接受消息成功');
+//             },
+//             onSuccess: function () {
+//               console.log('Channel ' + channel.value + ' 订阅成功。');
+//             },
+//             onFailed: function (error) {
+//               createErrorModal({
+//                 title: t('sys.api.errorTip'),
+//                 content: '建立WebSocket通信连接成功，但是订阅频道失败，请稍后再试',
+//               });
+//             },
+//           });
+//           go('/result/index/' + channel.value);
+//         } else {
+//           createErrorModal({
+//             title: t('sys.api.errorTip'),
+//             content: res.data.msg,
+//           });
+//         }
+//       }
+//       return {
+//         example,
+//         selectOptions,
+//         current,
+//         stepsNum,
+//         next,
+//         pre,
+//         confirm,
+//         cancel,
+//         randomString,
+//         cmOptions,
+//         codeOptions,
+//         changeExample,
+//       };
+//     },
+//   });
+// </script> -->
