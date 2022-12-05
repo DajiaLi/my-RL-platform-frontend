@@ -8,5 +8,5 @@ enum Api {
 }
 
 export function RunTask(params) {
-  return defHttp.post({ url: Api.Test, params });
+  return defHttp.post({ url: Api.Run, params });
 }

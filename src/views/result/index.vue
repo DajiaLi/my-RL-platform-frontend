@@ -9,6 +9,26 @@
       </div>
     </template>
     <Description @register="infoRegister" class="enter-y" />
+    <div class="mb-2"></div>
+    <div class="mb-2"></div>
+    <ARow>
+      <ACol :span="17">
+        <ACard title="实时训练信息">
+          <ATextarea
+            v-model:value="textareaValue"
+            :disabled="false"
+            placeholder="Basic usage"
+            :rows="30"
+          />
+        </ACard>
+      </ACol>
+      <ACol :span="6" :offset="1">
+        <ACard title="数据下载">
+          <template #extra><span style="color: gray; opacity: 0.3"></span></template>
+          数据包括训练的模型和图片等
+        </ACard>
+      </ACol>
+    </ARow>
   </PageWrapper>
 </template>
 <script lang="ts" setup>
@@ -20,8 +40,9 @@
 
   const route = useRoute();
 
-  const commonLinkRender = (text: string) => (href) => h('a', { href, target: '_blank' }, text);
+  let textareaValue = ref('');
 
+  const commonLinkRender = (text: string) => (href) => h('a', { href, target: '_blank' }, text);
   const [infoRegister] = useDescription({
     title: '项目信息',
     data: {
